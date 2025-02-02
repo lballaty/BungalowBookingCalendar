@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bungalow Booking</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    .booking-form {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .price-summary {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+    }
+    .price-summary h3 {
+      margin-top: 0;
+      color: #555;
+    }
+    .price-summary p {
+      margin: 5px 0;
+    }
+    .price-summary .total {
+      font-weight: bold;
+      color: #333;
+    }
+    @media (max-width: 600px) {
+      .booking-form {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Bungalow Booking</h2>
+  <div class="booking-form">
+    <!-- Bungalow Selection Field -->
+    <div class="form-group">
+      <label for="bungalow-selection">Select Bungalow</label>
+      <select id="bungalow-selection" name="bungalow-selection">
+        <option value="1">Bungalow 1</option>
+        <option value="2">Bungalow 2</option>
+        <option value="both">Both Bungalows</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="checkin-date">Check-in Date</label>
+      <input type="date" id="checkin-date" name="checkin-date" />
+    </div>
+    <div class="form-group">
+      <label for="checkout-date">Check-out Date</label>
+      <input type="date" id="checkout-date" name="checkout-date" />
+    </div>
+    <div class="form-group">
+      <label for="guests">Number of Guests</label>
+      <input type="number" id="guests" name="guests" min="2" max="10" value="2"/>
+    </div>
+
+    <div class="form-group">
+      <!-- Calculate Button -->
+      <button id="calculate-btn" type="button">Calculate</button>
+    </div>
+
+    <div class="price-summary">
+      <h3>Price Summary</h3>
+      <p>Per Night Rate: <span id="per-night-rate">-</span></p>
+      <p>Cleaning Fee: <span id="cleaning-fee">100€</span></p>
+      <p>Additional Guest Fee: <span id="additional-guest-fee">0€</span></p>
+      <p class="total">Total Price: <span id="total-price">-</span></p>
+    </div>
+  </div>
+
+  <script>
+    // Pricing periods (start date, end date, price per night)
+    const pricingPeriods = [
+      { start: "2024-01-16", end: "2024-02-23", price: 90 },
+      { start: "2024-02-24", end: "2024-02-28", price: 95 },
+      { start: "2024-04-01", end: "2024-04-06", price: 95 },
+      { start: "2024-04-07", end: "2024-04-20", price: 105 },
+      { start: "2024-04-21", end: "2024-04-30", price: 99 },
+      { start: "2024-05-01", end: "2024-05-25", price: 105 },
+      { start: "2024-05-26", end: "2024-05-31", price: 95 },
+      { start: "2024-06-01", end: "2024-09-30", price: 105 },
+      { start: "2024-10-01", end: "2024-11-30", price: 99 },
+      { start: "2024-12-01", end: "2024-12-14", price: 105 },
+    ];
+
+    // Constants for fees
+    const CLEANING_FEE = 100;           // Per stay per bungalow
+    const ADDITIONAL_GUEST_RATE = 10;   // Per additional guest, per night
+
+    // Get references to the input fields and price display elements
+    const bungalowSelection = document.getElementById("bungalow-selection");
+    const checkinDate       = document.getElementById("checkin-date");
+    const checkoutDate      = document.getElementById("checkout-date");
+    const guestsInput       = document.getElementById("guests");
+    const perNightRate      = document.getElementById("per-night-rate");
+    const cleaningFee       = document.getElementById("cleaning-fee");
+    const additionalGuestFee= document.getElementById("additional-guest-fee");
+    const totalPrice        = document.getElementById("total-price");
+    const calculateBtn      = document.getElementById("calculate-btn");
+
+    // Function to calculate the total price
+    function calculateTotalPrice() {
+      const checkin = new Date(checkinDate.value);
+      const checkout = new Date(checkoutDate.value);
+      const guests = parseInt(guestsInput.value, 10);
+
+      // Determine how many bungalows are selected
+      let numberOfBungalows = 1;
+      if (bungalowSelection.value === "both") {
+        numberOfBungalows = 2;
+      }
+
+      // 1) Validate that we have valid date selections
+      if (!checkin.valueOf() || !checkout.valueOf()) {
+        alert("Please select both check-in and check-out dates.");
+        return;
+      }
+
+      // 2) Check if check-in is the same or after check-out
+      if (checkin >= checkout) {
+        alert("Check-in date must be before the check-out date.");
+        return;
+      }
+
+      // Loop through each day of the stay to get the base nightly rate
+      let totalNightly = 0;
+      let currentDate = new Date(checkin);
+
+      while (currentDate < checkout) {
+        const dateStr = currentDate.toISOString().split("T")[0];
+        const period = pricingPeriods.find(
+          (p) => dateStr >= p.start && dateStr <= p.end
+        );
+        if (period) {
+          totalNightly += period.price;
+        } else {
+          // If no matching period, add 0 or handle the missing pricing as needed
+          totalNightly += 0;
+        }
+        // Move to the next day
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Multiply nightly cost by number of bungalows
+      totalNightly = totalNightly * numberOfBungalows;
+
+      // Calculate the number of nights
+      const numberOfNights = Math.ceil((checkout - checkin) / (1000 * 60 * 60 * 24));
+
+      // Each bungalow includes 2 guests at no extra charge,
+      // so for 2 bungalows, that's 4 included guests
+      const includedGuests = 2 * numberOfBungalows;
+      const additionalGuests = Math.max(0, guests - includedGuests);
+      const additionalFee = additionalGuests * ADDITIONAL_GUEST_RATE * numberOfNights;
+
+      // The cleaning fee is per stay per bungalow
+      const totalCleaningFee = CLEANING_FEE * numberOfBungalows;
+
+      // Final total
+      const finalTotal = totalNightly + totalCleaningFee + additionalFee;
+
+      // Update the price summary on the page
+      perNightRate.textContent = `${totalNightly}€ (for ${numberOfBungalows} bungalow${numberOfBungalows > 1 ? "s" : ""})`;
+      cleaningFee.textContent = `${totalCleaningFee}€`;
+      additionalGuestFee.textContent = `${additionalFee}€`;
+      totalPrice.textContent = `${finalTotal}€`;
+    }
+
+    // Calculate only when the "Calculate" button is clicked
+    calculateBtn.addEventListener("click", calculateTotalPrice);
+
+    // OPTIONAL: If you want to recalculate automatically upon any input change,
+    // uncomment the lines below:
+    /*
+    bungalowSelection.addEventListener('change', calculateTotalPrice);
+    checkinDate.addEventListener('change', calculateTotalPrice);
+    checkoutDate.addEventListener('change', calculateTotalPrice);
+    guestsInput.addEventListener('input', calculateTotalPrice);
+    */
+  </script>
+</body>
+</html>
